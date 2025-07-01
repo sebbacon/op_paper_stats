@@ -23,23 +23,32 @@ def run_cloc() -> str:
     if result.returncode != 0:
         sys.exit(f"cloc failed: {result.stderr.strip()}")
 
+    # Add debug output
+    print("CLOC RAW OUTPUT:\n" + result.stdout, file=sys.stderr)
+    
     # Parse CSV output
     for line in result.stdout.split("\n"):
-        if line.startswith("360,Python,"):
+        # Modified parsing logic to handle varying file counts
+        if ",Python," in line:
             parts = line.split(",")
-            blank = int(parts[2])
-            comment = int(parts[3])
-            code = int(parts[4])
-            total = blank + comment + code
-            return (
-                "| Metric | Value |\n"
-                "| --- | --- |\n"
-                f"| Lines of Code | {code:,} |\n"
-                f"| Blank Lines | {blank:,} |\n"
-                f"| Comment Lines | {comment:,} |\n"
-                f"| Total Lines | {total:,} |"
-            )
-    sys.exit("Failed to find Python statistics in cloc output")
+            try:
+                files = int(parts[0])
+                blank = int(parts[2])
+                comment = int(parts[3])
+                code = int(parts[4])
+                total = blank + comment + code
+                return (
+                    "| Metric | Value |\n"
+                    "| --- | --- |\n"
+                    f"| Lines of Code | {code:,} |\n"
+                    f"| Blank Lines | {blank:,} |\n"
+                    f"| Comment Lines | {comment:,} |\n"
+                    f"| Total Lines | {total:,} |"
+                )
+            except (IndexError, ValueError) as e:
+                sys.exit(f"Failed to parse cloc output: {e}\nLine: {line}")
+
+    sys.exit(f"Failed to find Python statistics in cloc output. Full output:\n{result.stdout}")
 
 
 def main() -> None:
