@@ -24,9 +24,9 @@ def run_cloc() -> str:
         sys.exit(f"cloc failed: {result.stderr.strip()}")
 
     # Parse CSV output
-    for line in result.stdout.split('\n'):
-        if line.startswith('360,Python,'):
-            parts = line.split(',')
+    for line in result.stdout.split("\n"):
+        if line.startswith("360,Python,"):
+            parts = line.split(",")
             blank = int(parts[2])
             comment = int(parts[3])
             code = int(parts[4])
