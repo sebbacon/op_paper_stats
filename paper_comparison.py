@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Paper comparison and analysis tool for OpenPrescribing research.
-Generates an interactive HTML report comparing papers.csv and op_papers.csv.
+Generates an interactive HTML report comparing PubMed and Google Scholar datasets.
 """
 
 import pandas as pd
@@ -88,10 +88,10 @@ class PaperComparator:
     
     def load_and_normalize_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Load both CSV files and normalize the data."""
-        logger.info("Loading papers.csv...")
+        logger.info("Loading PubMed dataset...")
         papers_df = pd.read_csv(self.papers_csv)
         
-        logger.info("Loading op_papers.csv...")
+        logger.info("Loading Google Scholar dataset...")
         op_papers_df = pd.read_csv(self.op_papers_csv)
         
         # Fill missing values first
@@ -111,26 +111,26 @@ class PaperComparator:
         op_papers_df = op_papers_df[op_papers_df['match_key'] != '']
         
         # De-duplicate within each file on match_key
-        logger.info("De-duplicating papers.csv...")
+        logger.info("De-duplicating PubMed dataset...")
         papers_df = papers_df.drop_duplicates(subset=['match_key'], keep='first')
         
-        logger.info("De-duplicating op_papers.csv...")
+        logger.info("De-duplicating Google Scholar dataset...")
         op_papers_df = op_papers_df.drop_duplicates(subset=['match_key'], keep='first')
         
         # Ensure core_paper column exists in papers_df
         if 'core_paper' not in papers_df.columns:
             papers_df['core_paper'] = 0
         
-        logger.info(f"Loaded {len(papers_df)} papers from papers.csv")
-        logger.info(f"Loaded {len(op_papers_df)} papers from op_papers.csv")
+        logger.info(f"Loaded {len(papers_df)} papers from PubMed")
+        logger.info(f"Loaded {len(op_papers_df)} papers from Google Scholar")
         
         return papers_df, op_papers_df
     
     def tag_provenance(self, papers_df: pd.DataFrame, op_papers_df: pd.DataFrame) -> pd.DataFrame:
         """Tag records with provenance and merge datasets."""
         # Add source tags
-        papers_df['source'] = 'papers'
-        op_papers_df['source'] = 'op_papers'
+        papers_df['source'] = 'pubmed'
+        op_papers_df['source'] = 'google_scholar'
         
         # Create additional title-based match keys for cross-matching
         papers_df['title_match_key'] = papers_df['Title'].apply(lambda x: f"title:{self.normalize_title(x)}" if x else "")
@@ -197,10 +197,10 @@ class PaperComparator:
             
             if len(sources) >= 2:
                 provenance = 'both'
-            elif 'papers' in sources:
-                provenance = 'papers'
-            elif 'op_papers' in sources:
-                provenance = 'op_papers'
+            elif 'pubmed' in sources:
+                provenance = 'pubmed'
+            elif 'google_scholar' in sources:
+                provenance = 'google_scholar'
             else:
                 provenance = 'unknown'
             
@@ -223,7 +223,7 @@ class PaperComparator:
         
         # For deduplication, prioritize records that appear in both sources
         combined_df['priority'] = combined_df['in_source'].map({
-            'both': 1, 'papers': 2, 'op_papers': 3, 'unknown': 4
+            'both': 1, 'pubmed': 2, 'google_scholar': 3, 'unknown': 4
         })
         
         # Deduplicate by match_key first (for DOI-based matches)
@@ -248,13 +248,13 @@ class PaperComparator:
         """Identify intersection and gap sets."""
         sets = {
             'intersection': df[df['in_source'] == 'both'].copy(),
-            'papers_only': df[df['in_source'] == 'papers'].copy(),
-            'op_only': df[df['in_source'] == 'op_papers'].copy()
+            'pubmed_only': df[df['in_source'] == 'pubmed'].copy(),
+            'google_scholar_only': df[df['in_source'] == 'google_scholar'].copy()
         }
         
         logger.info(f"Intersection: {len(sets['intersection'])} papers")
-        logger.info(f"Papers-only gap: {len(sets['papers_only'])} papers")
-        logger.info(f"OP-only gap: {len(sets['op_only'])} papers")
+        logger.info(f"PubMed-only gap: {len(sets['pubmed_only'])} papers")
+        logger.info(f"Google Scholar-only gap: {len(sets['google_scholar_only'])} papers")
         
         return sets
     
@@ -411,8 +411,8 @@ class PaperComparator:
             'summary_stats': {
                 'total_papers': len(df),
                 'intersection_count': len(comparison_sets['intersection']),
-                'papers_only_count': len(comparison_sets['papers_only']),
-                'op_only_count': len(comparison_sets['op_only']),
+                'pubmed_only_count': len(comparison_sets['pubmed_only']),
+                'google_scholar_only_count': len(comparison_sets['google_scholar_only']),
                 'core_papers_count': len(df[df['is_core_paper']]),
                 'year_distribution': df['year_bucket'].value_counts().to_dict(),
                 'source_distribution': df['in_source'].value_counts().to_dict(),
@@ -446,8 +446,8 @@ class PaperComparator:
         th { background: #f8f9fa; font-weight: 600; position: sticky; top: 0; }
         .badge { padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: 500; }
         .badge-both { background: #d4edda; color: #155724; }
-        .badge-papers { background: #cce5ff; color: #004085; }
-        .badge-op { background: #fff3cd; color: #856404; }
+        .badge-pubmed { background: #cce5ff; color: #004085; }
+        .badge-google-scholar { background: #fff3cd; color: #856404; }
         .badge-core { background: #f8d7da; color: #721c24; }
         .doi-link { color: #007bff; text-decoration: none; }
         .doi-link:hover { text-decoration: underline; }
@@ -464,7 +464,7 @@ class PaperComparator:
 <body>
     <div class="container">
         <h1>Paper Comparison Report</h1>
-        <p>Comparing papers.csv and op_papers.csv datasets</p>
+        <p>Comparing PubMed and Google Scholar datasets</p>
         
         <div class="dashboard" id="dashboard">
             <div class="stat-card">
@@ -476,12 +476,12 @@ class PaperComparator:
                 <div class="stat-label">In Both Sets</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number" id="papers-only-count">{{ data.summary_stats.papers_only_count }}</div>
-                <div class="stat-label">Papers Only</div>
+                <div class="stat-number" id="pubmed-only-count">{{ data.summary_stats.pubmed_only_count }}</div>
+                <div class="stat-label">PubMed Only</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number" id="op-only-count">{{ data.summary_stats.op_only_count }}</div>
-                <div class="stat-label">OP Only</div>
+                <div class="stat-number" id="google-scholar-only-count">{{ data.summary_stats.google_scholar_only_count }}</div>
+                <div class="stat-label">Google Scholar Only</div>
             </div>
             <div class="stat-card">
                 <div class="stat-number" id="core-count">{{ data.summary_stats.core_papers_count }}</div>
@@ -494,8 +494,8 @@ class PaperComparator:
                 <label>Source Filter:</label>
                 <button class="btn active" data-filter="all">All</button>
                 <button class="btn" data-filter="both">Both</button>
-                <button class="btn" data-filter="papers">Papers Only</button>
-                <button class="btn" data-filter="op_papers">OP Only</button>
+                <button class="btn" data-filter="pubmed">PubMed Only</button>
+                <button class="btn" data-filter="google_scholar">Google Scholar Only</button>
             </div>
             <div class="control-group">
                 <label>Show Core Papers Only:</label>
@@ -554,7 +554,7 @@ class PaperComparator:
                     `<a href="https://doi.org/${paper.doi_normalized}" target="_blank" class="doi-link">${paper.doi_normalized}</a>` : 
                     'N/A';
                 
-                const sourceBadge = `<span class="badge badge-${paper.in_source === 'both' ? 'both' : paper.in_source === 'papers' ? 'papers' : 'op'}">${paper.in_source}</span>`;
+                const sourceBadge = `<span class="badge badge-${paper.in_source === 'both' ? 'both' : paper.in_source === 'pubmed' ? 'pubmed' : 'google-scholar'}">${paper.in_source === 'google_scholar' ? 'Google Scholar' : paper.in_source}</span>`;
                 const matchBadge = `<span class="badge ${paper.match_type === 'DOI' ? 'badge-both' : 'badge-op'}">${paper.match_type}</span>`;
                 const coreBadge = paper.is_core_paper ? '<span class="badge badge-core">Core</span>' : '';
                 
