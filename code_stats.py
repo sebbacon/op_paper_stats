@@ -16,15 +16,12 @@ def validate_executables() -> Tuple[bool, str]:
 def run_cloc() -> str:
     """Run cloc analysis on Python files and return formatted markdown."""
     result = subprocess.run(
-        ["cloc", "--include-lang=Python", "--csv", "."],
+        ["cloc", "--include-lang=Python", "--csv", "openprescribing-repo"],
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
         sys.exit(f"cloc failed: {result.stderr.strip()}")
-
-    # Add debug output
-    print("CLOC RAW OUTPUT:\n" + result.stdout, file=sys.stderr)
 
     # Parse CSV output
     for line in result.stdout.split("\n"):
