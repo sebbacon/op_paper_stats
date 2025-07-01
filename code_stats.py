@@ -25,7 +25,7 @@ def run_cloc() -> str:
 
     # Add debug output
     print("CLOC RAW OUTPUT:\n" + result.stdout, file=sys.stderr)
-    
+
     # Parse CSV output
     for line in result.stdout.split("\n"):
         # Modified parsing logic to handle varying file counts
@@ -48,7 +48,9 @@ def run_cloc() -> str:
             except (IndexError, ValueError) as e:
                 sys.exit(f"Failed to parse cloc output: {e}\nLine: {line}")
 
-    sys.exit(f"Failed to find Python statistics in cloc output. Full output:\n{result.stdout}")
+    sys.exit(
+        f"Failed to find Python statistics in cloc output. Full output:\n{result.stdout}"
+    )
 
 
 def main() -> None:
