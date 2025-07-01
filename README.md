@@ -46,4 +46,6 @@ I compared this with a Google Scholar search, by using [Publish or Perish](https
 
 I wrote a script (with Claude Code) to help visualise the differences - [here's the output]().
 
+Regenerate it with `run_analysis.sh`
+
 [^1]: Romy Sauvayre, [Types of Errors Hiding in Google Scholar Data](https://www.jmir.org/2022/5/e28354/), JMIR 2022
