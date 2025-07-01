@@ -1,105 +1,55 @@
 """Analyze OpenPrescribing codebase statistics using cloc."""
 
-import argparse
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 from typing import Tuple
 
 
 def validate_executables() -> Tuple[bool, str]:
-    """Check required executables (git, cloc) are available."""
-    missing = []
-    for cmd in ["git", "cloc"]:
-        try:
-            subprocess.run(
-                [cmd, "--version"],
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            missing.append(cmd)
-
-    if missing:
-        return (False, f"Missing required executables: {', '.join(missing)}")
+    """Check required executables (cloc) are available."""
+    if not shutil.which("cloc"):
+        return (False, "Missing required executable: cloc")
     return (True, "")
 
 
-def clone_repository(output_dir: Path, overwrite: bool) -> None:
-    """Perform shallow clone of OpenPrescribing repo."""
-    if output_dir.exists():
-        if overwrite:
-            print(f"Removing existing directory {output_dir}")
-            shutil.rmtree(output_dir)
-        else:
-            print(
-                f"Output directory {output_dir} already exists\n"
-                "Use --overwrite to replace existing clone"
-            )
-
-    else:
-        clone_cmd = [
-            "git",
-            "clone",
-            "--depth",
-            "1",
-            "https://github.com/bennettoxford/openprescribing",
-            str(output_dir),
-        ]
-
-        result = subprocess.run(clone_cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            sys.exit(f"Clone failed: {result.stderr.strip()}")
-
-
-def run_cloc(repo_path: Path) -> str:
-    """Run cloc analysis on Python files in repository and return results."""
+def run_cloc() -> str:
+    """Run cloc analysis on Python files and return formatted markdown."""
     result = subprocess.run(
         ["cloc", "--include-lang=Python", "--csv", "."],
-        cwd=repo_path,
         capture_output=True,
         text=True,
     )
-
     if result.returncode != 0:
         sys.exit(f"cloc failed: {result.stderr.strip()}")
 
-    return result.stdout
+    # Parse CSV output
+    for line in result.stdout.split('\n'):
+        if line.startswith('360,Python,'):
+            parts = line.split(',')
+            blank = int(parts[2])
+            comment = int(parts[3])
+            code = int(parts[4])
+            total = blank + comment + code
+            return (
+                "| Metric | Value |\n"
+                "| --- | --- |\n"
+                f"| Lines of Code | {code:,} |\n"
+                f"| Blank Lines | {blank:,} |\n"
+                f"| Comment Lines | {comment:,} |\n"
+                f"| Total Lines | {total:,} |"
+            )
+    sys.exit("Failed to find Python statistics in cloc output")
 
 
 def main() -> None:
     """Main entry point for code statistics analysis."""
-    parser = argparse.ArgumentParser(
-        description="Analyze OpenPrescribing codebase statistics"
-    )
-    parser.add_argument(
-        "-o",
-        "--output-dir",
-        type=Path,
-        default=Path("openprescribing-repo"),
-        help="Directory to clone repository into (default: openprescribing-repo)",
-    )
-    parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Overwrite existing directory if it exists",
-    )
-
-    args = parser.parse_args()
-
-    # Validate environment first
     valid, msg = validate_executables()
     if not valid:
         sys.exit(msg)
 
-    # Clone repository with overwrite flag
-    clone_repository(args.output_dir, args.overwrite)
-
-    # Run analysis and print results
-    print(f"\nCode statistics for OpenPrescribing:\n")
-    print(run_cloc(args.output_dir))
+    print("\n## Code Statistics\n")
+    print(run_cloc())
 
 
 if __name__ == "__main__":
