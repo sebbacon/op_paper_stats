@@ -44,7 +44,7 @@ Now, to print metrics:
 
 I compared this with a Google Scholar search, by using [Publish or Perish](https://harzing.com/resources/publish-or-perish) with a keyword search of `openprescribing`. The results are in `op_papers.csv`. There are 672, compared with 142 using the Pubmed method.
 
-I wrote a script (with Claude Code) to help visualise the differences - [here's the output]().
+I wrote a script (with Claude Code) to help visualise the differences - [here's the output](https://sebbacon.github.io/op_paper_stats/paper_comparison_report.html).
 
 Regenerate it with `run_analysis.sh`
 
