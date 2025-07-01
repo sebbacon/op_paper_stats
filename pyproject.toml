@@ -1,0 +1,19 @@
+[project]
+name = "openprescribing-paper"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = "==3.12"
+dependencies = [
+    "aider-chat>=0.84.0",
+    "black>=25.1.0",
+    "google-cloud-bigquery>=3.34.0",
+    "pandas>=2.3.0",
+    "tabulate>=0.9.0",
+    "requests>=2.31.0",
+    "jinja2>=3.1.0",
+    "numpy>=1.24.0",
+]
+
+[tool.uv.sources]
+aider-chat = { git = "https://github.com/tekacs/aider", rev = "navigator" }
