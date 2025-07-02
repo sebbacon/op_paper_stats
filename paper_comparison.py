@@ -19,24 +19,27 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class PaperComparator:
-    def __init__(self, papers_csv: str, op_papers_csv: str, cache_dir: str = "crossref_cache"):
+    def __init__(
+        self, papers_csv: str, op_papers_csv: str, cache_dir: str = "crossref_cache"
+    ):
         self.papers_csv = papers_csv
         self.op_papers_csv = op_papers_csv
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(exist_ok=True)
-        
+
         # CrossRef API settings
         self.crossref_base_url = "https://api.crossref.org/works/"
         self.crossref_delay = 1.0  # Rate limiting
-        
+
     def normalize_doi(self, doi: str) -> str:
         """Normalize DOI by removing prefixes and converting to lowercase."""
         if pd.isna(doi) or not doi:
             return ""
-        
+
         doi = str(doi).strip().lower()
-        
+
         # Remove common prefixes
         prefixes = [
             "doi:",
@@ -45,38 +48,38 @@ class PaperComparator:
             "https://dx.doi.org/",
             "http://dx.doi.org/",
         ]
-        
+
         for prefix in prefixes:
             if doi.startswith(prefix):
-                doi = doi[len(prefix):]
+                doi = doi[len(prefix) :]
                 break
-        
+
         return doi.strip()
-    
+
     def normalize_title(self, title: str) -> str:
         """Normalize title for matching by handling punctuation and whitespace variations.
         Uses only the first 18 words in lowercase."""
         if pd.isna(title) or not title:
             return ""
-        
+
         title = str(title).strip().lower()
-        
+
         # Remove trailing periods and other end punctuation
-        title = re.sub(r'[.!?]+$', '', title)
-        
+        title = re.sub(r"[.!?]+$", "", title)
+
         # Replace common punctuation with spaces but preserve structure
         # Keep apostrophes in contractions, replace other punctuation with spaces
-        title = re.sub(r'[^\w\s\']', ' ', title)
-        
+        title = re.sub(r"[^\w\s\']", " ", title)
+
         # Normalize multiple spaces to single spaces
-        title = re.sub(r'\s+', ' ', title)
-        
+        title = re.sub(r"\s+", " ", title)
+
         # Take only the first 18 words
         words = title.strip().split()
-        title = ' '.join(words[:18])
-        
+        title = " ".join(words[:18])
+
         return title
-    
+
     def create_match_key(self, doi: str, title: str) -> str:
         """Create a matching key using DOI if available, otherwise normalized title."""
         doi_norm = self.normalize_doi(doi)
@@ -85,342 +88,392 @@ class PaperComparator:
         else:
             title_norm = self.normalize_title(title)
             return f"title:{title_norm}" if title_norm else ""
-    
+
     def load_and_normalize_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Load both CSV files and normalize the data."""
         logger.info("Loading PubMed dataset...")
         papers_df = pd.read_csv(self.papers_csv)
-        
+
         logger.info("Loading Google Scholar dataset...")
         op_papers_df = pd.read_csv(self.op_papers_csv)
-        
+
+        # Remove citations from the GA stuff -- they are usually cruft
+        op_papers_df = op_papers_df[op_papers_df["Type"] != "CITATION"]
+
         # Fill missing values first
-        papers_df = papers_df.fillna('')
-        op_papers_df = op_papers_df.fillna('')
-        
+        papers_df = papers_df.fillna("")
+        op_papers_df = op_papers_df.fillna("")
+
         # Normalize DOIs and titles
-        papers_df['doi_normalized'] = papers_df['DOI'].apply(self.normalize_doi)
-        op_papers_df['doi_normalized'] = op_papers_df['DOI'].apply(self.normalize_doi)
-        
+        papers_df["doi_normalized"] = papers_df["DOI"].apply(self.normalize_doi)
+        op_papers_df["doi_normalized"] = op_papers_df["DOI"].apply(self.normalize_doi)
+
         # Create match keys (DOI preferred, title fallback)
-        papers_df['match_key'] = papers_df.apply(lambda row: self.create_match_key(row['DOI'], row['Title']), axis=1)
-        op_papers_df['match_key'] = op_papers_df.apply(lambda row: self.create_match_key(row['DOI'], row['Title']), axis=1)
-        
+        papers_df["match_key"] = papers_df.apply(
+            lambda row: self.create_match_key(row["DOI"], row["Title"]), axis=1
+        )
+        op_papers_df["match_key"] = op_papers_df.apply(
+            lambda row: self.create_match_key(row["DOI"], row["Title"]), axis=1
+        )
+
         # Remove rows with empty match keys (no DOI and no title)
-        papers_df = papers_df[papers_df['match_key'] != '']
-        op_papers_df = op_papers_df[op_papers_df['match_key'] != '']
-        
+        papers_df = papers_df[papers_df["match_key"] != ""]
+        op_papers_df = op_papers_df[op_papers_df["match_key"] != ""]
+
         # De-duplicate within each file on match_key
         logger.info("De-duplicating PubMed dataset...")
-        papers_df = papers_df.drop_duplicates(subset=['match_key'], keep='first')
-        
+        papers_df = papers_df.drop_duplicates(subset=["match_key"], keep="first")
+
         logger.info("De-duplicating Google Scholar dataset...")
-        op_papers_df = op_papers_df.drop_duplicates(subset=['match_key'], keep='first')
-        
+        op_papers_df = op_papers_df.drop_duplicates(subset=["match_key"], keep="first")
+
         # Ensure core_paper column exists in papers_df
-        if 'core_paper' not in papers_df.columns:
-            papers_df['core_paper'] = 0
-        
+        if "core_paper" not in papers_df.columns:
+            papers_df["core_paper"] = 0
+
         logger.info(f"Loaded {len(papers_df)} papers from PubMed")
         logger.info(f"Loaded {len(op_papers_df)} papers from Google Scholar")
-        
+
         return papers_df, op_papers_df
-    
-    def tag_provenance(self, papers_df: pd.DataFrame, op_papers_df: pd.DataFrame) -> pd.DataFrame:
+
+    def tag_provenance(
+        self, papers_df: pd.DataFrame, op_papers_df: pd.DataFrame
+    ) -> pd.DataFrame:
         """Tag records with provenance and merge datasets."""
         # Add source tags
-        papers_df['source'] = 'pubmed'
-        op_papers_df['source'] = 'google_scholar'
-        
+        papers_df["source"] = "pubmed"
+        op_papers_df["source"] = "google_scholar"
+
         # Create additional title-based match keys for cross-matching
-        papers_df['title_match_key'] = papers_df['Title'].apply(lambda x: f"title:{self.normalize_title(x)}" if x else "")
-        op_papers_df['title_match_key'] = op_papers_df['Title'].apply(lambda x: f"title:{self.normalize_title(x)}" if x else "")
-        
+        papers_df["title_match_key"] = papers_df["Title"].apply(
+            lambda x: f"title:{self.normalize_title(x)}" if x else ""
+        )
+        op_papers_df["title_match_key"] = op_papers_df["Title"].apply(
+            lambda x: f"title:{self.normalize_title(x)}" if x else ""
+        )
+
         # Standardize column names for merging
         papers_columns = {
-            'Authors': 'authors',
-            'Title': 'title', 
-            'Source': 'journal',
-            'Year': 'year',
-            'DOI': 'doi_original',
-            'Citations': 'citations',
-            'doi_normalized': 'doi_normalized',
-            'match_key': 'match_key',
-            'title_match_key': 'title_match_key',
-            'core_paper': 'core_paper',
-            'source': 'source'
+            "Authors": "authors",
+            "Title": "title",
+            "Source": "journal",
+            "Year": "year",
+            "DOI": "doi_original",
+            "Citations": "citations",
+            "doi_normalized": "doi_normalized",
+            "match_key": "match_key",
+            "title_match_key": "title_match_key",
+            "core_paper": "core_paper",
+            "source": "source",
         }
-        
+
         op_papers_columns = {
-            'Authors': 'authors',
-            'Title': 'title',
-            'Source': 'journal', 
-            'Year': 'year',
-            'DOI': 'doi_original',
-            'Cites': 'citations',
-            'doi_normalized': 'doi_normalized',
-            'match_key': 'match_key',
-            'title_match_key': 'title_match_key',
-            'source': 'source'
+            "Authors": "authors",
+            "Title": "title",
+            "Source": "journal",
+            "Year": "year",
+            "DOI": "doi_original",
+            "Cites": "citations",
+            "doi_normalized": "doi_normalized",
+            "match_key": "match_key",
+            "title_match_key": "title_match_key",
+            "source": "source",
         }
-        
+
         # Rename and select relevant columns
-        papers_clean = papers_df.rename(columns=papers_columns)[list(papers_columns.values())]
-        op_papers_clean = op_papers_df.rename(columns=op_papers_columns)[list(op_papers_columns.values())]
-        
+        papers_clean = papers_df.rename(columns=papers_columns)[
+            list(papers_columns.values())
+        ]
+        op_papers_clean = op_papers_df.rename(columns=op_papers_columns)[
+            list(op_papers_columns.values())
+        ]
+
         # Add missing columns
-        if 'core_paper' not in op_papers_clean.columns:
-            op_papers_clean['core_paper'] = 0
-            
+        if "core_paper" not in op_papers_clean.columns:
+            op_papers_clean["core_paper"] = 0
+
         # Combine datasets
         combined_df = pd.concat([papers_clean, op_papers_clean], ignore_index=True)
-        
+
         # Enhanced matching: check both primary match_key and title_match_key
         def determine_provenance_and_match_method(row):
             # Find all rows that match either by primary key or title key
-            primary_matches = combined_df[combined_df['match_key'] == row['match_key']]
+            primary_matches = combined_df[combined_df["match_key"] == row["match_key"]]
             title_matches = combined_df[
-                (combined_df['title_match_key'] == row['title_match_key']) & 
-                (combined_df['title_match_key'] != '')
+                (combined_df["title_match_key"] == row["title_match_key"])
+                & (combined_df["title_match_key"] != "")
             ]
-            
+
             # Determine if this was matched by title only
             title_only_match = (
-                len(title_matches) > 1 and 
-                len(primary_matches) == 1 and
-                row['title_match_key'] != ''
+                len(title_matches) > 1
+                and len(primary_matches) == 1
+                and row["title_match_key"] != ""
             )
-            
+
             # Combine both types of matches
             all_matches = pd.concat([primary_matches, title_matches]).drop_duplicates()
-            sources = set(all_matches['source'])
-            
+            sources = set(all_matches["source"])
+
             if len(sources) >= 2:
-                provenance = 'both'
-            elif 'pubmed' in sources:
-                provenance = 'pubmed'
-            elif 'google_scholar' in sources:
-                provenance = 'google_scholar'
+                provenance = "both"
+            elif "pubmed" in sources:
+                provenance = "pubmed"
+            elif "google_scholar" in sources:
+                provenance = "google_scholar"
             else:
-                provenance = 'unknown'
-            
+                provenance = "unknown"
+
             # Determine match method
             if title_only_match:
-                match_method = 'Title'
-            elif row['match_key'].startswith('doi:'):
-                match_method = 'DOI'
-            elif row['match_key'].startswith('title:'):
-                match_method = 'Title'
+                match_method = "Title"
+            elif row["match_key"].startswith("doi:"):
+                match_method = "DOI"
+            elif row["match_key"].startswith("title:"):
+                match_method = "Title"
             else:
-                match_method = 'Unknown'
-                
+                match_method = "Unknown"
+
             return provenance, match_method
-        
+
         # Apply the function and split results
-        results = combined_df.apply(determine_provenance_and_match_method, axis=1, result_type='expand')
-        combined_df['in_source'] = results[0]
-        combined_df['original_match_method'] = results[1]
-        
+        results = combined_df.apply(
+            determine_provenance_and_match_method, axis=1, result_type="expand"
+        )
+        combined_df["in_source"] = results[0]
+        combined_df["original_match_method"] = results[1]
+
         # For deduplication, prioritize records that appear in both sources
-        combined_df['priority'] = combined_df['in_source'].map({
-            'both': 1, 'pubmed': 2, 'google_scholar': 3, 'unknown': 4
-        })
-        
+        combined_df["priority"] = combined_df["in_source"].map(
+            {"both": 1, "pubmed": 2, "google_scholar": 3, "unknown": 4}
+        )
+
         # Deduplicate by match_key first (for DOI-based matches)
-        combined_df = combined_df.sort_values(['match_key', 'priority', 'core_paper'], ascending=[True, True, False])
-        combined_df = combined_df.drop_duplicates(subset=['match_key'], keep='first')
-        
+        combined_df = combined_df.sort_values(
+            ["match_key", "priority", "core_paper"], ascending=[True, True, False]
+        )
+        combined_df = combined_df.drop_duplicates(subset=["match_key"], keep="first")
+
         # Then deduplicate by title_match_key (for title-based matches)
         # Only deduplicate records that don't already have 'both' provenance
-        combined_df = combined_df.sort_values(['title_match_key', 'priority', 'core_paper'], ascending=[True, True, False])
-        title_mask = (combined_df['title_match_key'] != '') & (combined_df['in_source'] != 'both')
+        combined_df = combined_df.sort_values(
+            ["title_match_key", "priority", "core_paper"], ascending=[True, True, False]
+        )
+        title_mask = (combined_df["title_match_key"] != "") & (
+            combined_df["in_source"] != "both"
+        )
         if title_mask.any():
-            non_both_df = combined_df[title_mask].drop_duplicates(subset=['title_match_key'], keep='first')
+            non_both_df = combined_df[title_mask].drop_duplicates(
+                subset=["title_match_key"], keep="first"
+            )
             both_df = combined_df[~title_mask]
             combined_df = pd.concat([both_df, non_both_df], ignore_index=True)
-        
-        combined_df = combined_df.drop(columns=['priority'])
+
+        combined_df = combined_df.drop(columns=["priority"])
         logger.info(f"Combined dataset has {len(combined_df)} unique papers")
-        
+
         return combined_df
-    
+
     def identify_comparison_sets(self, df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         """Identify intersection and gap sets."""
         sets = {
-            'intersection': df[df['in_source'] == 'both'].copy(),
-            'pubmed_only': df[df['in_source'] == 'pubmed'].copy(),
-            'google_scholar_only': df[df['in_source'] == 'google_scholar'].copy()
+            "intersection": df[df["in_source"] == "both"].copy(),
+            "pubmed_only": df[df["in_source"] == "pubmed"].copy(),
+            "google_scholar_only": df[df["in_source"] == "google_scholar"].copy(),
         }
-        
+
         logger.info(f"Intersection: {len(sets['intersection'])} papers")
         logger.info(f"PubMed-only gap: {len(sets['pubmed_only'])} papers")
-        logger.info(f"Google Scholar-only gap: {len(sets['google_scholar_only'])} papers")
-        
+        logger.info(
+            f"Google Scholar-only gap: {len(sets['google_scholar_only'])} papers"
+        )
+
         return sets
-    
+
     def get_crossref_metadata(self, doi: str) -> Optional[Dict]:
         """Fetch metadata from CrossRef API with caching."""
         if not doi or pd.isna(doi):
             return None
-        
+
         doi = str(doi)  # Ensure it's a string
         cache_file = self.cache_dir / f"{hashlib.md5(doi.encode()).hexdigest()}.json"
-        
+
         # Check cache first
         if cache_file.exists():
             try:
-                with open(cache_file, 'r') as f:
+                with open(cache_file, "r") as f:
                     return json.load(f)
             except:
                 pass
-        
+
         # Fetch from API
         try:
             time.sleep(self.crossref_delay)  # Rate limiting
-            response = requests.get(f"{self.crossref_base_url}{doi}", 
-                                  headers={'User-Agent': 'PaperComparator/1.0'})
-            
+            response = requests.get(
+                f"{self.crossref_base_url}{doi}",
+                headers={"User-Agent": "PaperComparator/1.0"},
+            )
+
             if response.status_code == 200:
                 data = response.json()
                 # Cache the result
-                with open(cache_file, 'w') as f:
+                with open(cache_file, "w") as f:
                     json.dump(data, f)
                 return data
             else:
-                logger.warning(f"CrossRef API returned {response.status_code} for DOI: {doi}")
+                logger.warning(
+                    f"CrossRef API returned {response.status_code} for DOI: {doi}"
+                )
                 return None
-                
+
         except Exception as e:
             logger.warning(f"Error fetching CrossRef data for {doi}: {e}")
             return None
-    
-    def enrich_with_crossref(self, df: pd.DataFrame, max_requests: int = 50) -> pd.DataFrame:
+
+    def enrich_with_crossref(
+        self, df: pd.DataFrame, max_requests: int = 50
+    ) -> pd.DataFrame:
         """Enrich dataset with CrossRef metadata."""
-        logger.info(f"Enriching with CrossRef metadata (max {max_requests} requests)...")
-        
+        logger.info(
+            f"Enriching with CrossRef metadata (max {max_requests} requests)..."
+        )
+
         # Add empty columns for CrossRef data
-        df['crossref_journal'] = ''
-        df['crossref_abstract'] = ''
-        df['crossref_subjects'] = ''
-        df['crossref_author_count'] = 0
-        df['crossref_issn'] = ''
-        df['crossref_pub_date'] = ''
-        
+        df["crossref_journal"] = ""
+        df["crossref_abstract"] = ""
+        df["crossref_subjects"] = ""
+        df["crossref_author_count"] = 0
+        df["crossref_issn"] = ""
+        df["crossref_pub_date"] = ""
+
         # Process a subset of DOIs to avoid hitting API limits
-        dois_to_process = df[df['doi_normalized'] != '']['doi_normalized'].unique()[:max_requests]
-        
+        dois_to_process = df[df["doi_normalized"] != ""]["doi_normalized"].unique()[
+            :max_requests
+        ]
+
         for i, doi in enumerate(dois_to_process):
             if i % 10 == 0:
                 logger.info(f"Processing DOI {i+1}/{len(dois_to_process)}")
-                
+
             metadata = self.get_crossref_metadata(doi)
-            if metadata and 'message' in metadata:
-                work = metadata['message']
-                
+            if metadata and "message" in metadata:
+                work = metadata["message"]
+
                 # Extract relevant fields
-                journal = ''
-                if 'container-title' in work and work['container-title']:
-                    journal = work['container-title'][0]
-                
-                abstract = work.get('abstract', '')
+                journal = ""
+                if "container-title" in work and work["container-title"]:
+                    journal = work["container-title"][0]
+
+                abstract = work.get("abstract", "")
                 if abstract:
-                    abstract = abstract[:500] + '...' if len(abstract) > 500 else abstract
-                
+                    abstract = (
+                        abstract[:500] + "..." if len(abstract) > 500 else abstract
+                    )
+
                 subjects = []
-                if 'subject' in work:
-                    subjects = work['subject'][:3]  # Limit to first 3 subjects
-                
-                author_count = len(work.get('author', []))
-                
-                issn = ''
-                if 'ISSN' in work and work['ISSN']:
-                    issn = work['ISSN'][0]
-                
-                pub_date = ''
-                if 'published-print' in work:
-                    date_parts = work['published-print'].get('date-parts', [[]])
+                if "subject" in work:
+                    subjects = work["subject"][:3]  # Limit to first 3 subjects
+
+                author_count = len(work.get("author", []))
+
+                issn = ""
+                if "ISSN" in work and work["ISSN"]:
+                    issn = work["ISSN"][0]
+
+                pub_date = ""
+                if "published-print" in work:
+                    date_parts = work["published-print"].get("date-parts", [[]])
                     if date_parts and date_parts[0]:
-                        pub_date = '-'.join(map(str, date_parts[0]))
-                
+                        pub_date = "-".join(map(str, date_parts[0]))
+
                 # Update dataframe
-                mask = df['doi_normalized'] == doi
-                df.loc[mask, 'crossref_journal'] = journal
-                df.loc[mask, 'crossref_abstract'] = abstract
-                df.loc[mask, 'crossref_subjects'] = ', '.join(subjects)
-                df.loc[mask, 'crossref_author_count'] = author_count
-                df.loc[mask, 'crossref_issn'] = issn
-                df.loc[mask, 'crossref_pub_date'] = pub_date
-        
+                mask = df["doi_normalized"] == doi
+                df.loc[mask, "crossref_journal"] = journal
+                df.loc[mask, "crossref_abstract"] = abstract
+                df.loc[mask, "crossref_subjects"] = ", ".join(subjects)
+                df.loc[mask, "crossref_author_count"] = author_count
+                df.loc[mask, "crossref_issn"] = issn
+                df.loc[mask, "crossref_pub_date"] = pub_date
+
         return df
-    
+
     def compute_analytical_fields(self, df: pd.DataFrame) -> pd.DataFrame:
         """Compute additional analytical fields."""
         # Convert year to numeric
-        df['year_numeric'] = pd.to_numeric(df['year'], errors='coerce')
-        
+        df["year_numeric"] = pd.to_numeric(df["year"], errors="coerce")
+
         # Create year buckets
         def year_bucket(year):
             if pd.isna(year):
-                return 'Unknown'
+                return "Unknown"
             year = int(year)
             if year <= 2010:
-                return '≤2010'
+                return "≤2010"
             elif year <= 2015:
-                return '2011-2015'
+                return "2011-2015"
             elif year <= 2020:
-                return '2016-2020'
+                return "2016-2020"
             else:
-                return '≥2021'
-        
-        df['year_bucket'] = df['year_numeric'].apply(year_bucket)
-        
+                return "≥2021"
+
+        df["year_bucket"] = df["year_numeric"].apply(year_bucket)
+
         # Unified citation count
-        df['citations_numeric'] = pd.to_numeric(df['citations'], errors='coerce').fillna(0)
-        
+        df["citations_numeric"] = pd.to_numeric(
+            df["citations"], errors="coerce"
+        ).fillna(0)
+
         # Use the original match method if available, otherwise derive from match_key
-        if 'original_match_method' in df.columns:
-            df['match_type'] = df['original_match_method']
+        if "original_match_method" in df.columns:
+            df["match_type"] = df["original_match_method"]
         else:
+
             def get_match_type(x):
                 if pd.isna(x) or not x:
-                    return 'Unknown'
+                    return "Unknown"
                 x = str(x)
-                if x.startswith('doi:'):
-                    return 'DOI'
-                elif x.startswith('title:'):
-                    return 'Title'
+                if x.startswith("doi:"):
+                    return "DOI"
+                elif x.startswith("title:"):
+                    return "Title"
                 else:
-                    return 'Unknown'
-            
-            df['match_type'] = df['match_key'].apply(get_match_type)
-        
+                    return "Unknown"
+
+            df["match_type"] = df["match_key"].apply(get_match_type)
+
         # Boolean flags
-        df['is_core_paper'] = df['core_paper'] == 1
-        df['has_abstract'] = df['crossref_abstract'] != ''
-        df['is_likely_false_positive'] = None  # To be filled by curator
-        
+        df["is_core_paper"] = df["core_paper"] == 1
+        df["has_abstract"] = df["crossref_abstract"] != ""
+        df["is_likely_false_positive"] = None  # To be filled by curator
+
         return df
-    
-    def generate_html_report(self, df: pd.DataFrame, comparison_sets: Dict[str, pd.DataFrame]) -> str:
+
+    def generate_html_report(
+        self, df: pd.DataFrame, comparison_sets: Dict[str, pd.DataFrame]
+    ) -> str:
         """Generate the interactive HTML report."""
-        
+
         # Prepare data for JSON embedding
         report_data = {
-            'all_papers': df.to_dict('records'),
-            'comparison_sets': {k: v.to_dict('records') for k, v in comparison_sets.items()},
-            'summary_stats': {
-                'total_papers': len(df),
-                'intersection_count': len(comparison_sets['intersection']),
-                'pubmed_only_count': len(comparison_sets['pubmed_only']),
-                'google_scholar_only_count': len(comparison_sets['google_scholar_only']),
-                'core_papers_count': len(df[df['is_core_paper']]),
-                'year_distribution': df['year_bucket'].value_counts().to_dict(),
-                'source_distribution': df['in_source'].value_counts().to_dict(),
-                'match_type_distribution': df['match_type'].value_counts().to_dict()
+            "all_papers": df.to_dict("records"),
+            "comparison_sets": {
+                k: v.to_dict("records") for k, v in comparison_sets.items()
             },
-            'data_hash': hashlib.sha256(df.to_csv().encode()).hexdigest()[:16]
+            "summary_stats": {
+                "total_papers": len(df),
+                "intersection_count": len(comparison_sets["intersection"]),
+                "pubmed_only_count": len(comparison_sets["pubmed_only"]),
+                "google_scholar_only_count": len(
+                    comparison_sets["google_scholar_only"]
+                ),
+                "core_papers_count": len(df[df["is_core_paper"]]),
+                "year_distribution": df["year_bucket"].value_counts().to_dict(),
+                "source_distribution": df["in_source"].value_counts().to_dict(),
+                "match_type_distribution": df["match_type"].value_counts().to_dict(),
+            },
+            "data_hash": hashlib.sha256(df.to_csv().encode()).hexdigest()[:16],
         }
-        
+
         html_template = """
 <!DOCTYPE html>
 <html lang="en">
@@ -701,41 +754,41 @@ class PaperComparator:
 </body>
 </html>
         """
-        
+
         template = Template(html_template)
         return template.render(
-            data=report_data,
-            data_json=json.dumps(report_data, default=str)
+            data=report_data, data_json=json.dumps(report_data, default=str)
         )
-    
+
     def run_analysis(self, output_file: str = "paper_comparison_report.html"):
         """Run the complete analysis pipeline."""
         logger.info("Starting paper comparison analysis...")
-        
+
         # Step 1: Load and normalize data
         papers_df, op_papers_df = self.load_and_normalize_data()
-        
+
         # Step 2: Tag provenance and merge
         combined_df = self.tag_provenance(papers_df, op_papers_df)
-        
+
         # Step 3: Identify comparison sets
         comparison_sets = self.identify_comparison_sets(combined_df)
-        
+
         # Step 4: Enrich with CrossRef metadata (limited requests)
         combined_df = self.enrich_with_crossref(combined_df, max_requests=50)
-        
+
         # Step 5: Compute analytical fields
         combined_df = self.compute_analytical_fields(combined_df)
-        
+
         # Step 6: Generate HTML report
         html_report = self.generate_html_report(combined_df, comparison_sets)
-        
+
         # Write report to file
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             f.write(html_report)
-        
+
         logger.info(f"Report generated: {output_file}")
         return combined_df, comparison_sets
+
 
 if __name__ == "__main__":
     comparator = PaperComparator("papers.csv", "op_papers.csv")
