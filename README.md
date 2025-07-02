@@ -1,4 +1,10 @@
-# TL;DR
+# OpenPrescribing stats
+
+This is a collection of scripts to generate counts of various things for our OpenPrescribing paper.
+
+The output is in [`REPORT.md`](./REPORT.md).
+
+## How to generate the report
 
 To set up:
 
@@ -21,28 +27,27 @@ Then, to generate report:
 
 # Citations metrics
 
-The `citations.py` module uses PubMed to attempt to get citation info.
+It's basically impossible to get reasonably accurate citation metrics. Google Scholar is by far the most sensitive, and is known to have lots of accuracy issues [^1]. WoS is considered very specific, but misses out a lot of real papers.
 
-It fetches all papers matching 'openprescribing' from pubmed, where "matching" means "full text where available and metadata where not".
+A search on some of the most common websites using the keyword `openprescribing` gives the following:
 
-It uses pubmed because Google Scholar is known to have lots of accuracy issues [^1]
+| Source               | Access Type     | Count / Notes                                    |
+| -------------------- | --------------- | ------------------------------------------------ |
+| Scopus               | ❌ No full text | 150 papers, plus 26 preprints, 77 secondary docs |
+| Web of Science (WoS) | ❌ No full text | 39 outputs                                       |
+| CORE (core.ac.uk)    | ✅ Full text    | 165 outputs                                      |
+| PubMed Central (PMC) | ✅ Full text    | 165 outputs                                      |
+| BASE                 | ✅ Full text    | 57 outputs                                       |
+| Google Scholar       | ✅ Full text    | \~850 results                                    |
 
-However, using pubmed means we will not pick up:
+The `citations.py` module in this repo uses PubMed _plus_ PubMed Central to get as much PubMed content as possible. The script fetches all papers matching 'openprescribing' from pubmed, where "matching" means "match _full text_ where available in PMC and _metadata_ from PM where not". However, using pubmed means we will not pick up:
 
 - papers not covered by pubmed (mainly, this means papers not in biosciences)
 - non-open-access papers which mention openprescribing outside metadata (for example, only in references)
 
-To get paper metrics and write to a CSV:
+I compared the output of this PubMed search with a Google Scholar search, by using [Publish or Perish](https://harzing.com/resources/publish-or-perish) with a keyword search of `"openprescribing"` (quotes are required). The results are in `op_papers.csv`.
 
-    python data/citations/fetch.py metrics --output <path>
-
-Now you'll need to add a core_papers column with `1` to mark papers that you consider core to the project, and `0` for papers that you don't -- the idea is that these are things that cite the core papers.
-
-Now, to print metrics:
-
-    python data/citations/fetch.py metrics --input <path>
-
-I compared this with a Google Scholar search, by using [Publish or Perish](https://harzing.com/resources/publish-or-perish) with a keyword search of `openprescribing`. The results are in `op_papers.csv`. There are 672, compared with 142 using the Pubmed method.
+There are 672 in Google Scholar, compared with 142 using the Pubmed method.
 
 I wrote a script (with Claude Code) to help visualise the differences - [here's the output](https://sebbacon.github.io/op_paper_stats/paper_comparison_report.html). (You can regenerate it against fresh data with `run_analysis.sh`)
 
@@ -63,13 +68,27 @@ I took a random sample of 12 papers that were in the google scholar report, but 
 | 11  | [Noise & Health (Frontiers)](https://www.frontiersin.org/journals/sustainable-cities/articles/10.3389/frsc.2020.00041/full)                                                                                                                                                         | ✅ Legit paper      | Not in PubMed                 |
 | 12  | [Tesco Grocery Dataset](https://www.nature.com/articles/s41597-020-0397-7)                                                                                                                                                                                                          | ✅ Legit paper      | Not in PubMed                 |
 
-### Summary:
+Next, I wrote [a script](./gs_analysis.py) to use an LLM to classify the Google Scholar matches:
 
-- ✅ Legit papers: 4
-- 🪶 Short paper-lite: 3
-- ❌ Not papers: 4
-- 🧪 Preprint: 1
+- Download the article URL that Google Scholar provides (where available)
+- Of the ones which it's possible to download:
+  - Classify them with a prompt, in order to work out which ones are real academic papers
+  - Also classify them as the entire article, or abstract only
+  - For those which are the entire article, report on the ones which contain the string "opensafely"
 
-Approx. 35% over-ascertainment in Google Scholar vs PubMed appears plausible.
+The [analysis report](./gs_analysis_report.md) shows:
+
+- 588 non-citation results from Google
+- Of these, 369 had content that could be downloaded
+- Of these, 174 were classified as academic papers (the rest were preprints, briefings, editorials, theses, etc)
+- Of these, 144 were classfied as the full paper, rather than just the abstract
+- Of these, 108 (75%) contained the string "openprescribing"
+
+If we assume
+
+- 25% of all hits for openprescribing in Google Scholar are simply wrong
+- 53% of all hits in Google Scholar are for non-paper types
+
+Then this implies around 207 "true" papers in the Google Scholar corpus.
 
 [^1]: Romy Sauvayre, [Types of Errors Hiding in Google Scholar Data](https://www.jmir.org/2022/5/e28354/), JMIR 2022

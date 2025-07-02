@@ -15,3 +15,4 @@ wheels/
 openprescribing-repo
 gcp-credentials.json
 crossref_cache/
+data/
