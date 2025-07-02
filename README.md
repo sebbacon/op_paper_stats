@@ -46,25 +46,30 @@ I compared this with a Google Scholar search, by using [Publish or Perish](https
 
 I wrote a script (with Claude Code) to help visualise the differences - [here's the output](https://sebbacon.github.io/op_paper_stats/paper_comparison_report.html). (You can regenerate it against fresh data with `run_analysis.sh`)
 
-Here's a random sample of papers that were in the google scholar report, but not the pubmed. If this is representative seems like approximately 35% over ascertainment.
+I took a random sample of 12 papers that were in the google scholar report, but not the pubmed.
 
-- 4 of them are definitely legit papers.
-- 3 are legit but very short paper-lite
-- 4 were definitely not papers
-- 1 was a preprint
+| #   | Title (linked)                                                                                                                                                                                                                                                                      | Category            | Notes                         |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ----------------------------- |
+| 1   | [Hyponatraemia in primary care](https://www.bmj.com/content/365/bmj.l1774.abstract)                                                                                                                                                                                                 | ❌ Not a paper      | BMJ "Practice Pointer", cited |
+| 2   | [Inequalities in prescription rates...](https://www.sciencedirect.com/science/article/abs/pii/S8756328219304193)                                                                                                                                                                    | ✅ Legit paper      | Possibly missed due to access |
+| 3   | [Impacts of Health Policies (arXiv)](https://arxiv.org/pdf/2305.19878)                                                                                                                                                                                                              | 🧪 Preprint         | Cited by 1                    |
+| 4   | [NEL Mental Health Needs](https://www.nelincsdata.net/wp-content/uploads/NELC_Mental_Health_and_Wellbeing_Report_2019.pdf)                                                                                                                                                          | ❌ Not a paper      | Public health report          |
+| 5   | [OpenPrescribing citation](https://scholar.google.com/scholar?q=OpenPrescribing%3A%20normalised%20data%20and%20software%20tool%20to%20research%20trends%20in%20English%20NHS%20primary%20care%20prescribing%201998%E2%80%932016.%20BMJ%20Open.%202018%3B%208%20%282%29%20%E2%80%A6) | ❌ Not a paper      | Citation reference only       |
+| 6   | [GIRFT COPD (poster)](https://www.proquest.com/openview/bc2f6ddbbd8c31e480399e7109b8fb45/1?pq-origsite=gscholar&cbl=2041050)                                                                                                                                                        | ❌ Not a paper      | Conference poster             |
+| 7   | [Pharmacist intervention](https://academic.oup.com/ijpp/article/30/Supplement_2/ii27/6854518)                                                                                                                                                                                       | 🪶 Short paper-lite | Very brief, borderline        |
+| 8   | [RA inhaler study](https://www.sciencedirect.com/science/article/pii/S0954611117304328)                                                                                                                                                                                             | 🪶 Short paper-lite | “Short communication”         |
+| 9   | [Oral anticoagulants thesis](https://researchonline.lshtm.ac.uk/id/eprint/4674716/1/2024_EPH_PhD_Teoh_M.pdf)                                                                                                                                                                        | ❌ Not a paper      | PhD thesis                    |
+| 10  | [Oral Candidiasis](file:///Users/sebbacon/Downloads/79325_93-98.pdf)                                                                                                                                                                                                                | ✅ Legit paper      | Not in PubMed                 |
+| 11  | [Noise & Health (Frontiers)](https://www.frontiersin.org/journals/sustainable-cities/articles/10.3389/frsc.2020.00041/full)                                                                                                                                                         | ✅ Legit paper      | Not in PubMed                 |
+| 12  | [Tesco Grocery Dataset](https://www.nature.com/articles/s41597-020-0397-7)                                                                                                                                                                                                          | ✅ Legit paper      | Not in PubMed                 |
 
-1. [Hyponatraemia in primary care(https://www.bmj.com/content/365/bmj.l1774.abstract). A "Practice Pointer" in BMJ, rather than a paper. Recorded as "cited by 10" in Google Scholar
-2. [Inequalities in prescription rates of anti-osteoporosis drugs in primary care in England: A practice-level prescribing data analysis in 2013-2018](https://www.sciencedirect.com/science/article/abs/pii/S8756328219304193). Possibly because not open access?
-3. [Investigating Impacts of Health Policies Using Staggered Difference-inDifferences: The Effects of Adoption of an Online Consultation System
-   on Prescribing Patterns of Antibiotics](https://arxiv.org/pdf/2305.19878) - a preprint. Cited by 1
-4. [North East Lincolnshire MENTAL HEALTH AND WELL BEING NEEDS ASSESSMENT 2018](https://www.nelincsdata.net/wp-content/uploads/NELC_Mental_Health_and_Wellbeing_Report_2019.pdf) - not a paper
-5. [OpenPrescribing: normalised data and software tool to research trends in English NHS primary care prescribing 1998–2016. BMJ Open. 2018; 8 (2) ](<https://scholar.google.com/scholar?q=OpenPrescribing%3A%20normalised%20data%20and%20software%20tool%20to%20research%20trends%20in%20English%20NHS%20primary%20care%20prescribing%201998%E2%80%932016.%20BMJ%20Open.%202018%3B%208%20(2)%20%E2%80%A6>) -- apears as a "citation" as well as the paper - this is the former
-6. [P38 ‘Getting it right first time’ (GIRFT) in the management of COPD](https://www.proquest.com/openview/bc2f6ddbbd8c31e480399e7109b8fb45/1?pq-origsite=gscholar&cbl=2041050) - a poster, not a paper (there were 5 of these from one conference)
-7. [Pharmacist intervention in cardiovascular disease prevention: lipid modifying treatment optimisation in type 2 diabetes within hastings primary care network](https://academic.oup.com/ijpp/article/30/Supplement_2/ii27/6854518) - a proper academic article, but not really a paper (very short). Probably valid
-8. [Physical ability of people with rheumatoid arthritis and age-sex matched controls to use four commonly prescribed inhaler devices](https://www.sciencedirect.com/science/article/pii/S0954611117304328) - "short communication" article type. [Was in pubmed](https://pubmed.ncbi.nlm.nih.gov/29414447/), so unclear why not found in pubmed search.
-9. [Real-world effectiveness of oral anticoagulants in the prevention of stroke: emulation and extension of the ARISTOTLE trial using UK EHRs](https://researchonline.lshtm.ac.uk/id/eprint/4674716/1/2024_EPH_PhD_Teoh_M.pdf) - this is a doctoral thesis
-10. [Risk Elements Linked to Oral Candidiasis](file:///Users/sebbacon/Downloads/79325_93-98.pdf) - looks like a legit paper, not in Pubmed
-11. [Social Media and Open Data to Quantify the Effects of Noise on Health](https://www.frontiersin.org/journals/sustainable-cities/articles/10.3389/frsc.2020.00041/full) - legit paper, not in pubmed
-12. [Tesco Grocery 1.0, a large-scale dataset of grocery purchases in London](https://www.nature.com/articles/s41597-020-0397-7) - legit paper
+### Summary:
+
+- ✅ Legit papers: 4
+- 🪶 Short paper-lite: 3
+- ❌ Not papers: 4
+- 🧪 Preprint: 1
+
+Approx. 35% over-ascertainment in Google Scholar vs PubMed appears plausible.
 
 [^1]: Romy Sauvayre, [Types of Errors Hiding in Google Scholar Data](https://www.jmir.org/2022/5/e28354/), JMIR 2022
