@@ -25,7 +25,8 @@ Then, to generate report:
     echo >> REPORT.md
     python characteristics.py all >> REPORT.md
 
-# Citations metrics
+
+# Citations metrics
 
 It's basically impossible to get reasonably accurate citation metrics. Google Scholar is by far the most sensitive, and is known to have lots of accuracy issues [^1]. WoS is considered very specific, but misses out a lot of real papers.
 
